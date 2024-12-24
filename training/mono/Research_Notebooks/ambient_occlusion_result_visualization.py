@@ -284,7 +284,7 @@ def convnext_tiny(pretrained=True,in_22k=False, **kwargs):
 
         print(
             'Successfully loaded pretrained %d paras, and %d paras are unmatched.'
-#             %(len(pretrained_dict.keys()), len(unmatched_pretrained_dict.keys())))
+             %(len(pretrained_dict.keys()), len(unmatched_pretrained_dict.keys())))
 
         print('\n')
 
