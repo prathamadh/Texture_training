@@ -611,6 +611,26 @@ class Roughness_head(nn.Module):
         return self.head(self.conv_blk2(self.conv_blk1(self.channel_fix(x))))
 
 
+
+class AO_head(nn.Module):
+   
+    def __init__(self, input_channels=96):
+        super(AO_head, self).__init__()
+        self.channel_fix = nn.Conv2d(input_channels,64, kernel_size=3, stride=1, padding=1)
+        self.conv_blk1=ConvBlock(channels=64)
+        self.conv_blk2=ConvBlock(channels=64)
+        self.head=nn.Sequential(
+            # Reduce channels while keeping spatial dimensions the same
+            nn.Conv2d(64,32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(32, 1, kernel_size=3, stride=1, padding=1),
+
+            )
+            
+
+    def forward(self, x):
+        return self.head(self.conv_blk2(self.conv_blk1(self.channel_fix(x))))
+
+
 class RAFTDepthNormalDPT5(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -646,21 +666,7 @@ class RAFTDepthNormalDPT5(nn.Module):
                       self.num_depth_regressor_anchor,
                       kernel_size=1),
         )
-        self.roughness_regressor = nn.Sequential(
-                nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True),  # First, upscale spatial dimensions
-                nn.Conv2d(
-                    self.used_res_channel,
-                    self.num_roughness_regressor_anchor,
-                    kernel_size=3,
-                    padding=1
-                ),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    self.num_roughness_regressor_anchor,
-                    self.num_roughness_regressor_anchor,
-                    kernel_size=1
-                )
-            )
+
         self.normal_predictor = nn.Sequential(
             nn.Conv2d(self.used_res_channel,
                       128,
@@ -672,52 +678,8 @@ class RAFTDepthNormalDPT5(nn.Module):
             nn.Conv2d(128, 128, kernel_size=1), nn.ReLU(inplace=True),
             nn.Conv2d(128, 3, kernel_size=1),
         )
-        # self.roughness_predictor=nn.Sequential(
-        #     nn.Conv2d(self.used_res_channel,
-        #               128,
-        #               kernel_size=3,
-        #               padding=1),
-        #     # nn.BatchNorm2d(128),
-        #     nn.ReLU(inplace=True),
-        #     nn.Conv2d(128, 128, kernel_size=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(128, 64, kernel_size=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(64, 36, kernel_size=1),
-        #     nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False) 
-        #)
-        #self.roughness_head=nn.Sequential(nn.Conv2d(self.used_res_channel+1,
-        #               128,
-        #               kernel_size=3,
-        #               padding=1),
-        #     # nn.BatchNorm2d(128),
-        #     nn.ReLU(inplace=True),
-        #     nn.Conv2d(128, 128, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(128, 64, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(64, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 1, kernel_size=3,padding=1)
-            
-        #     )
-
-        # self.ao_head=nn.Sequential(nn.Conv2d(1,
-        #               128,
-        #               kernel_size=3,
-        #               padding=1),
-        #     # nn.BatchNorm2d(128),
-        #     nn.ReLU(inplace=True),
-        #     nn.Conv2d(128, 128, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(128, 64, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(64, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 32, kernel_size=3,padding=1), nn.ReLU(inplace=True),
-        #     nn.Conv2d(32, 1, kernel_size=3,padding=1)
-            
-        #     )
         self.roughness_head=Roughness_head(input_channels=96)
+        self.ao_head=AO_head(input_channels=96)
         self.context_feature_encoder = ContextFeatureEncoder(self.feature_channels, [self.hidden_dims, self.context_dims])
         self.context_zqr_convs = nn.ModuleList([nn.Conv2d(self.context_dims[i], self.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.n_gru_layers)])
         self.update_block = BasicMultiUpdateBlock(cfg, hidden_dims=self.hidden_dims, out_dims=6)
@@ -920,6 +882,7 @@ class RAFTDepthNormalDPT5(nn.Module):
         # self.pratham={"gray_images":gray_images,"depth_pred":depth_pred,"normal_pred":normal_pred,"roughness_pred":roughness_pred}
         # roughness_pred=torch.cat((gray_images,roughness_pred),dim=1)
         roughness_pred=self.roughness_head(feature_map)
+        ao_pred=self.ao_head(feature_map)
         depth_init = torch.cat((depth_pred, depth_confidence_map, normal_pred), dim=1) # (N, 1+1+4, H, W)
         # self.pratham = roughness_pred
         ## encoder features to context-feature for init-hidden-state and contex-features
@@ -988,6 +951,7 @@ class RAFTDepthNormalDPT5(nn.Module):
             normal_out_list=normal_outs,
             low_resolution_init=low_resolution_init,
             roughness=roughness_pred,
+            ao=ao_pred
         )
 
         return outputs
