@@ -939,7 +939,7 @@ class RAFTDepthNormalDPT5(nn.Module):
             flow_predictions.append(self.clamp(flow_up[:,:1] * self.regress_scale + self.max_val))
             conf_predictions.append(flow_up[:,1:2])
             normal_outs.append(norm_normalize(flow_up[:,2:].clone()))
-            ao_feat=self.aofeature(flow_predictions[-1])
+            ao_feat=self.ao_feature(flow_predictions[-1])
             ao_feature_map=torch.cat((gray_feat,ao_feat),dim=1)
             ao_pred=self.ao_head(ao_feature_map)
 
