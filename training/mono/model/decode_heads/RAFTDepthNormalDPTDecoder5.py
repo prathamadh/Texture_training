@@ -684,6 +684,7 @@ class RAFTDepthNormalDPT5(nn.Module):
         self.context_zqr_convs = nn.ModuleList([nn.Conv2d(self.context_dims[i], self.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.n_gru_layers)])
         self.update_block = BasicMultiUpdateBlock(cfg, hidden_dims=self.hidden_dims, out_dims=6)
         self.gray_feature=Gray_to_feature(input_channels=1, output_channels=64)
+        self.ao_feature=Gray_to_feature(input_channels=1, output_channels=64)
         self.up_roughness=Upscale_roughness(input_channels=self.used_res_channel,output_channels=32)
         self.relu = nn.ReLU(inplace=True)
         self.pratham=None
@@ -882,7 +883,7 @@ class RAFTDepthNormalDPT5(nn.Module):
         # self.pratham={"gray_images":gray_images,"depth_pred":depth_pred,"normal_pred":normal_pred,"roughness_pred":roughness_pred}
         # roughness_pred=torch.cat((gray_images,roughness_pred),dim=1)
         roughness_pred=self.roughness_head(feature_map)
-        ao_pred=self.ao_head(feature_map)
+        # ao_pred=self.ao_head(feature_map)
         depth_init = torch.cat((depth_pred, depth_confidence_map, normal_pred), dim=1) # (N, 1+1+4, H, W)
         # self.pratham = roughness_pred
         ## encoder features to context-feature for init-hidden-state and contex-features
@@ -938,6 +939,10 @@ class RAFTDepthNormalDPT5(nn.Module):
             flow_predictions.append(self.clamp(flow_up[:,:1] * self.regress_scale + self.max_val))
             conf_predictions.append(flow_up[:,1:2])
             normal_outs.append(norm_normalize(flow_up[:,2:].clone()))
+            ao_feat=self.aofeature(flow_predictions[-1])
+            ao_feature_map=torch.cat((gray_feat,ao_feat),dim=1)
+            ao_pred=self.ao_head(ao_feature_map)
+
         
         outputs=dict(
             prediction=flow_predictions[-1],
