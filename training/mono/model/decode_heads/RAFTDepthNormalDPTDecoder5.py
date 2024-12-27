@@ -552,7 +552,7 @@ class Gray_to_feature(nn.Module):
             nn.ReLU(),
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(128, output_channels, kernel_size=3, stride=1, padding=1),
         )
 
 
@@ -684,7 +684,7 @@ class RAFTDepthNormalDPT5(nn.Module):
         self.context_zqr_convs = nn.ModuleList([nn.Conv2d(self.context_dims[i], self.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.n_gru_layers)])
         self.update_block = BasicMultiUpdateBlock(cfg, hidden_dims=self.hidden_dims, out_dims=6)
         self.gray_feature=Gray_to_feature(input_channels=1, output_channels=64)
-        self.ao_feature=Gray_to_feature(input_channels=1, output_channels=64)
+        self.ao_feature=Gray_to_feature(input_channels=1, output_channels=32)
         self.up_roughness=Upscale_roughness(input_channels=self.used_res_channel,output_channels=32)
         self.relu = nn.ReLU(inplace=True)
         self.pratham=None
