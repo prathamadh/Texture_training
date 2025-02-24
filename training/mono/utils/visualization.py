@@ -4,7 +4,7 @@ import numpy as np
 from mono.utils.transform import gray_to_colormap
 import shutil
 import glob
-from mono.utils.running import main_process
+
 import torch
 from html4vision import Col, imagetable
 
